@@ -1,0 +1,6 @@
+etc/
+usr/bin/krita
+usr/lib/*/kritaplugins/krita*.so
+usr/lib/*/libkrita*.so.*
+usr/share/*/*.appdata.xml
+usr/share/applications/

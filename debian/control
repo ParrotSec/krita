@@ -1,0 +1,98 @@
+Source: krita
+Section: kde
+Priority: optional
+Maintainer: Parrot Dev Team <parrot-devel@lists.parrotsec.org>
+XSBC-Original-Maintainer: Debian Qt/KDE Maintainers <debian-qt-kde@lists.debian.org>
+Uploaders: Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>
+Build-Depends: cmake (>= 2.8.12),
+               debhelper (>= 9),
+               extra-cmake-modules (>= 1.7.0),
+               gettext,
+               kio-dev (>= 5.7.0),
+               libboost-system-dev,
+               libcurl4-gnutls-dev | libcurl-dev,
+               libeigen3-dev,
+               libexiv2-dev,
+               libfftw3-dev,
+               libgsl-dev,
+               libjpeg-dev,
+               libkf5archive-dev (>= 5.7.0),
+               libkf5completion-dev (>= 5.7.0),
+               libkf5config-dev (>= 5.7.0),
+               libkf5coreaddons-dev (>= 5.7.0),
+               libkf5crash-dev (>= 5.7.0),
+               libkf5guiaddons-dev (>= 5.7.0),
+               libkf5i18n-dev (>= 5.7.0),
+               libkf5itemmodels-dev (>= 5.7.0),
+               libkf5itemviews-dev (>= 5.7.0),
+               libkf5widgetsaddons-dev (>= 5.7.0),
+               libkf5windowsystem-dev (>= 5.7.0),
+               liblcms2-dev,
+               libopencolorio-dev,
+               libopenexr-dev,
+               libpng-dev,
+               libpoppler-qt5-dev,
+               libqt5svg5-dev (>= 5.4.0),
+               libqt5x11extras5-dev (>= 5.4.0),
+               libraw-dev,
+               libtiff-dev,
+               libxcb-util0-dev,
+               libxcb1-dev,
+               libxi-dev,
+               pkg-config,
+               pkg-kde-tools (>= 0.15.16),
+               qtbase5-dev (>= 5.4.0),
+               zlib1g-dev
+Standards-Version: 3.9.8
+Homepage: https://krita.org/
+Vcs-Git: https://anonscm.debian.org/git/pkg-kde/kde-std/krita.git
+Vcs-Browser: https://anonscm.debian.org/git/pkg-kde/kde-std/krita.git
+
+Package: krita
+Architecture: any
+Section: graphics
+Depends: krita-data (>= ${source:Version}), ${misc:Depends}, ${shlibs:Depends}
+Suggests: colord, krita-l10n (>= ${source:Version})
+Breaks: krita-data (<< 1:2.4)
+Replaces: krita-data (<< 1:2.4)
+Description: pixel-based image manipulation program
+ Krita is a creative application for raster images. Whether you want to create
+ from scratch or work with existing images, Krita is for you. You can work with
+ photos or scanned images, or start with a blank slate. Krita supports most
+ graphics tablets out of the box.
+ .
+ Krita is different from other graphics design programs in that it has
+ pluggable brush engines, some supporting brush resources like Gimp brush files,
+ others offering sophisticated simulation of real brushes, and others again
+ offering color mixing and image deformations. Moreover, Krita has full
+ support for graphics tablets, including such features as pressure, tilt and
+ rate, making it a great choice for artists. There are easy to use tools for
+ drawing lines, ellipses and rectangles, and the freehand tool is supported by
+ pluggable "drawing assistants" that help you draw shapes that still have a
+ freehand feeling to them.
+ .
+ This package is part of the Calligra Suite.
+
+Package: krita-data
+Architecture: all
+Section: graphics
+Depends: ${misc:Depends}
+Description: data files for Krita painting program
+ This package contains architecture-independent data files for Krita,
+ the painting program shipped with the Calligra Suite.
+ .
+ See the krita package for further information.
+ .
+ This package is part of the Calligra Suite.
+
+Package: krita-l10n
+Architecture: all
+Section: localization
+Depends: ${misc:Depends}
+Description: translations for Krita painting program
+ This package contains the translations for Krita, the painting program
+ shipped with the Calligra Suite.
+ .
+ See the krita package for further information.
+ .
+ This package is part of the Calligra Suite.
