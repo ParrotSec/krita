@@ -1,0 +1,225 @@
+project(kritaflake)
+
+include_directories(
+    ${CMAKE_SOURCE_DIR}/libs/flake/commands
+    ${CMAKE_SOURCE_DIR}/libs/flake/tools
+    ${CMAKE_SOURCE_DIR}/libs/flake/svg
+    ${CMAKE_BINARY_DIR}/libs/flake
+)
+
+add_subdirectory(styles)
+add_subdirectory(tests)
+
+set(kritaflake_SRCS
+    KoGradientHelper.cpp
+    KoFlake.cpp
+    KoCanvasBase.cpp
+    KoResourceManager_p.cpp
+    KoDerivedResourceConverter.cpp
+    KoResourceUpdateMediator.cpp
+    KoCanvasResourceManager.cpp
+    KoDocumentResourceManager.cpp
+    KoCanvasObserverBase.cpp
+    KoCanvasSupervisor.cpp
+    KoDockFactoryBase.cpp
+    KoDockRegistry.cpp
+    KoDataCenterBase.cpp
+    KoInsets.cpp
+    KoPathShape.cpp
+    KoPathPoint.cpp
+    KoPathSegment.cpp
+    KoSelection.cpp
+    KoShape.cpp
+    KoShapeAnchor.cpp
+    KoShapeBasedDocumentBase.cpp
+    KoShapeApplicationData.cpp
+    KoShapeContainer.cpp
+    KoShapeContainerModel.cpp
+    KoShapeContainerDefaultModel.cpp
+    KoShapeGroup.cpp
+    KoShapeManagerPaintingStrategy.cpp
+    KoShapeManager.cpp
+    KoShapePaintingContext.cpp
+    KoFrameShape.cpp
+    KoUnavailShape.cpp
+    KoMarkerData.cpp
+    KoMarker.cpp
+    KoMarkerCollection.cpp
+    KoMarkerSharedLoadingData.cpp
+    KoToolBase.cpp
+    KoCanvasController.cpp
+    KoCanvasControllerWidget.cpp
+    KoCanvasControllerWidgetViewport_p.cpp
+    KoShapeRegistry.cpp
+    KoDeferredShapeFactoryBase.cpp
+    KoToolFactoryBase.cpp
+    KoPathShapeFactory.cpp
+    KoShapeFactoryBase.cpp
+    KoShapeUserData.cpp
+    KoParameterShape.cpp
+    KoPointerEvent.cpp
+    KoShapeController.cpp
+    KoToolSelection.cpp
+    KoShapeLayer.cpp
+    KoPostscriptPaintDevice.cpp
+    KoInputDevice.cpp
+    KoToolManager_p.cpp
+    KoToolManager.cpp
+    KoToolRegistry.cpp
+    KoToolProxy.cpp
+    KoShapeSavingContext.cpp
+    KoShapeLoadingContext.cpp
+    KoLoadingShapeUpdater.cpp
+    KoPathShapeLoader.cpp
+    KoShapeStrokeModel.cpp
+    KoShapeStroke.cpp
+    KoShapeBackground.cpp
+    KoColorBackground.cpp
+    KoGradientBackground.cpp
+    KoOdfGradientBackground.cpp
+    KoHatchBackground.cpp
+    KoPatternBackground.cpp
+    KoShapeConfigWidgetBase.cpp
+    KoDrag.cpp
+    KoDragOdfSaveHelper.cpp
+    KoShapeOdfSaveHelper.cpp
+    KoShapePaste.cpp
+    KoConnectionPoint.cpp
+    KoConnectionShape.cpp
+    KoConnectionShapeLoadingUpdater.cpp
+    KoConnectionShapeFactory.cpp
+    KoConnectionShapeConfigWidget.cpp
+    KoSnapGuide.cpp
+    KoSnapProxy.cpp
+    KoSnapStrategy.cpp
+    KoSnapData.cpp
+    KoShapeShadow.cpp
+    KoSharedLoadingData.cpp
+    KoSharedSavingData.cpp
+    KoViewConverter.cpp
+    KoInputDeviceHandler.cpp
+    KoInputDeviceHandlerEvent.cpp
+    KoInputDeviceHandlerRegistry.cpp
+    KoImageData.cpp
+    KoImageData_p.cpp
+    KoImageCollection.cpp
+    KoOdfWorkaround.cpp
+    KoFilterEffect.cpp
+    KoFilterEffectStack.cpp
+    KoFilterEffectFactoryBase.cpp
+    KoFilterEffectRegistry.cpp
+    KoFilterEffectConfigWidgetBase.cpp
+    KoFilterEffectRenderContext.cpp
+    KoFilterEffectLoadingContext.cpp
+    KoTextShapeDataBase.cpp
+    KoTosContainer.cpp
+    KoTosContainerModel.cpp
+    KoClipPath.cpp
+    KoCurveFit.cpp
+    commands/KoShapeGroupCommand.cpp
+    commands/KoShapeAlignCommand.cpp
+    commands/KoShapeBackgroundCommand.cpp
+    commands/KoShapeCreateCommand.cpp
+    commands/KoShapeDeleteCommand.cpp
+    commands/KoShapeDistributeCommand.cpp
+    commands/KoShapeLockCommand.cpp
+    commands/KoShapeMoveCommand.cpp
+    commands/KoShapeShearCommand.cpp
+    commands/KoShapeSizeCommand.cpp
+    commands/KoShapeStrokeCommand.cpp
+    commands/KoShapeUngroupCommand.cpp
+    commands/KoShapeReorderCommand.cpp
+    commands/KoShapeKeepAspectRatioCommand.cpp
+    commands/KoPathBaseCommand.cpp
+    commands/KoPathPointMoveCommand.cpp
+    commands/KoPathControlPointMoveCommand.cpp
+    commands/KoPathPointTypeCommand.cpp
+    commands/KoPathPointRemoveCommand.cpp
+    commands/KoPathPointInsertCommand.cpp
+    commands/KoPathSegmentBreakCommand.cpp
+    commands/KoPathBreakAtPointCommand.cpp
+    commands/KoPathSegmentTypeCommand.cpp
+    commands/KoPathCombineCommand.cpp
+    commands/KoSubpathRemoveCommand.cpp
+    commands/KoSubpathJoinCommand.cpp
+    commands/KoParameterHandleMoveCommand.cpp
+    commands/KoParameterToPathCommand.cpp
+    commands/KoShapeTransformCommand.cpp
+    commands/KoPathFillRuleCommand.cpp
+    commands/KoConnectionShapeTypeCommand.cpp
+    commands/KoShapeShadowCommand.cpp
+    commands/KoPathReverseCommand.cpp
+    commands/KoShapeRenameCommand.cpp
+    commands/KoShapeRunAroundCommand.cpp
+    commands/KoPathPointMergeCommand.cpp
+    commands/KoShapeTransparencyCommand.cpp
+    commands/KoShapeClipCommand.cpp
+    commands/KoShapeUnclipCommand.cpp
+    commands/KoPathShapeMarkerCommand.cpp
+    commands/KoShapeConnectionChangeCommand.cpp
+    tools/KoCreateShapeStrategy.cpp
+    tools/KoPathToolFactory.cpp
+    tools/KoPathTool.cpp
+    tools/KoPathToolSelection.cpp
+    tools/KoPathToolHandle.cpp
+    tools/PathToolOptionWidget.cpp
+    tools/KoPathPointRubberSelectStrategy.cpp
+    tools/KoPathPointMoveStrategy.cpp
+    tools/KoPathConnectionPointStrategy.cpp
+    tools/KoPathControlPointMoveStrategy.cpp
+    tools/KoParameterChangeStrategy.cpp
+    tools/KoZoomTool.cpp
+    tools/KoZoomToolFactory.cpp
+    tools/KoZoomToolWidget.cpp
+    tools/KoZoomStrategy.cpp
+    tools/KoPanTool.cpp
+    tools/KoPanToolFactory.cpp
+    tools/KoInteractionTool.cpp
+    tools/KoInteractionStrategy.cpp
+    tools/KoCreateShapesTool.cpp
+    tools/KoCreateShapesToolFactory.cpp
+    tools/KoShapeRubberSelectStrategy.cpp
+    tools/KoPathSegmentChangeStrategy.cpp
+    svg/KoShapePainter.cpp
+    svg/SvgUtil.cpp
+    svg/SvgGraphicContext.cpp
+    svg/SvgSavingContext.cpp
+    svg/SvgWriter.cpp
+    svg/SvgStyleWriter.cpp
+    svg/SvgShape.cpp
+    svg/SvgParser.cpp
+    svg/SvgStyleParser.cpp
+    svg/SvgGradientHelper.cpp
+    svg/SvgPatternHelper.cpp
+    svg/SvgFilterHelper.cpp
+    svg/SvgCssHelper.cpp
+    svg/SvgClipPathHelper.cpp
+    svg/SvgLoadingContext.cpp
+    svg/SvgShapeFactory.cpp
+
+    FlakeDebug.cpp
+)
+
+ki18n_wrap_ui(kritaflake_SRCS
+    tools/PathToolOptionWidgetBase.ui
+    KoConnectionShapeConfigWidget.ui
+    tools/KoZoomToolWidget.ui
+)
+
+add_library(kritaflake SHARED ${kritaflake_SRCS})
+generate_export_header(kritaflake BASE_NAME kritaflake)
+
+target_include_directories(kritaflake
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/commands>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/tools>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/svg>
+)
+
+target_link_libraries(kritaflake kritapigment kritawidgetutils kritaodf kritaundo2 KF5::WidgetsAddons Qt5::Svg)
+
+set_target_properties(kritaflake PROPERTIES
+    VERSION ${GENERIC_KRITA_LIB_VERSION} SOVERSION ${GENERIC_KRITA_LIB_SOVERSION}
+)
+
+install(TARGETS kritaflake  ${INSTALL_TARGETS_DEFAULT_ARGS})

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ActionCollection version="2" name="Tools">
+  <Actions category="Similar Selection Tool">
+    <text>Similar Selection Tool</text>
+  </Actions>
+</ActionCollection>

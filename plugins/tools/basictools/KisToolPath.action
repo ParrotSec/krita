@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ActionCollection version="2" name="Tools">
+  <Actions category="Path Tool">
+    <text>Path Tool</text>
+  </Actions>
+</ActionCollection>

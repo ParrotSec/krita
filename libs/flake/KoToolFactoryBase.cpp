@@ -1,0 +1,122 @@
+/* This file is part of the KDE project
+ * Copyright (C) 2006 Thomas Zander <zander@kde.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Library General Public License
+ * along with this library; see the file COPYING.LIB.  If not, write to
+ * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
+ */
+
+#include "KoToolFactoryBase.h"
+
+#include "KoToolBase.h"
+
+#include <QKeySequence>
+
+class Q_DECL_HIDDEN KoToolFactoryBase::Private
+{
+public:
+    Private(const QString &i)
+            : priority(100),
+            id(i)
+    {
+    }
+    int priority;
+    QString section;
+    QString tooltip;
+    QString activationId;
+    QString iconName;
+    const QString id;
+    QKeySequence shortcut;
+};
+
+
+KoToolFactoryBase::KoToolFactoryBase(const QString &id)
+        : d(new Private(id))
+{
+}
+
+KoToolFactoryBase::~KoToolFactoryBase()
+{
+    delete d;
+}
+
+QString KoToolFactoryBase::id() const
+{
+    return d->id;
+}
+
+int KoToolFactoryBase::priority() const
+{
+    return d->priority;
+}
+
+QString KoToolFactoryBase::section() const
+{
+    return d->section;
+}
+
+QString KoToolFactoryBase::toolTip() const
+{
+    return d->tooltip;
+}
+
+QString KoToolFactoryBase::iconName() const
+{
+    return d->iconName;
+}
+
+QString KoToolFactoryBase::activationShapeId() const
+{
+    return d->activationId;
+}
+
+QKeySequence KoToolFactoryBase::shortcut() const
+{
+    return d->shortcut;
+}
+
+void KoToolFactoryBase::setActivationShapeId(const QString &activationShapeId)
+{
+    d->activationId = activationShapeId;
+}
+
+void KoToolFactoryBase::setToolTip(const QString & tooltip)
+{
+    d->tooltip = tooltip;
+}
+
+void KoToolFactoryBase::setSection(const QString & section)
+{
+    d->section = section;
+}
+
+void KoToolFactoryBase::setIconName(const char *iconName)
+{
+    d->iconName = QLatin1String(iconName);
+}
+
+void KoToolFactoryBase::setIconName(const QString &iconName)
+{
+    d->iconName = iconName;
+}
+
+void KoToolFactoryBase::setPriority(int newPriority)
+{
+    d->priority = newPriority;
+}
+
+void KoToolFactoryBase::setShortcut(const QKeySequence &shortcut)
+{
+    d->shortcut = shortcut;
+}
