@@ -1,3 +1,9 @@
+krita (1:3.1.3-0parrot0) testing; urgency=medium
+
+  * New upstream release.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Sat, 20 May 2017 13:40:36 +0200
+
 krita (1:3.1.2.1-0parrot0) testing; urgency=medium
 
   * Import new upstream release
