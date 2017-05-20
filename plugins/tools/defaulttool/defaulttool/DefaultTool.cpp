@@ -57,10 +57,14 @@
 
 #include <KoIcon.h>
 
+#include <QPointer>
 #include <QAction>
 #include <QKeyEvent>
 #include <QClipboard>
 #include <KoResourcePaths.h>
+
+#include <KoCanvasController.h>
+#include <kactioncollection.h>
 
 #include <math.h>
 
@@ -71,8 +75,8 @@
 class NopInteractionStrategy : public KoInteractionStrategy
 {
 public:
-    explicit NopInteractionStrategy(KoToolBase *parent) 
-        : KoInteractionStrategy(parent) 
+    explicit NopInteractionStrategy(KoToolBase *parent)
+        : KoInteractionStrategy(parent)
     {
     }
 
@@ -92,16 +96,18 @@ public:
         : KoToolSelection(parent)
         , m_selection(parent->koSelection())
     {
-        Q_ASSERT(m_selection);
     }
 
     bool hasSelection() override
     {
-        return m_selection->count();
+        if (m_selection) {
+            return m_selection->count();
+        }
+        return false;
     }
 
 private:
-    KoSelection *m_selection;
+    QPointer<KoSelection> m_selection;
 };
 
 DefaultTool::DefaultTool(KoCanvasBase *canvas)
@@ -220,6 +226,9 @@ void DefaultTool::setupActions()
     QAction *actionUngroupBottom = actionRegistry->makeQAction("object_ungroup", this);
     addAction("object_ungroup", actionUngroupBottom);
     connect(actionUngroupBottom, SIGNAL(triggered()), this, SLOT(selectionUngroup()));
+
+    m_separatorAction = new QAction(this);
+    m_separatorAction->setSeparator(true);
 }
 
 qreal DefaultTool::rotationOfHandle(KoFlake::SelectionHandle handle, bool useEdgeRotation)
@@ -346,8 +355,8 @@ void DefaultTool::updateCursor()
     QCursor cursor = Qt::ArrowCursor;
 
     QString statusText;
-
-    if (koSelection()->count() > 0) { // has a selection
+    KoSelection * selection = koSelection();
+    if (selection && selection->count() > 0) { // has a selection
         bool editable = editableShapesCount(koSelection()->selectedShapes(KoFlake::StrippedSelection));
 
         if (!m_mouseWasInsideHandles) {
@@ -457,7 +466,7 @@ void DefaultTool::updateCursor()
 void DefaultTool::paint(QPainter &painter, const KoViewConverter &converter)
 {
     KoInteractionTool::paint(painter, converter);
-    if (currentStrategy() == 0 && koSelection()->count() > 0) {
+    if (currentStrategy() == 0 && koSelection() && koSelection()->count() > 0) {
         SelectionDecorator decorator(m_mouseWasInsideHandles ? m_lastHandle : KoFlake::NoHandle,
                                      true, true);
         decorator.setSelection(koSelection());
@@ -480,7 +489,7 @@ void DefaultTool::mousePressEvent(KoPointerEvent *event)
 void DefaultTool::mouseMoveEvent(KoPointerEvent *event)
 {
     KoInteractionTool::mouseMoveEvent(event);
-    if (currentStrategy() == 0 && koSelection()->count() > 0) {
+    if (currentStrategy() == 0 && koSelection() && koSelection()->count() > 0) {
         QRectF bound = handlesSize();
         if (bound.contains(event->point)) {
             bool inside;
@@ -640,7 +649,7 @@ void DefaultTool::keyPressEvent(QKeyEvent *event)
 
 void DefaultTool::customMoveEvent(KoPointerEvent *event)
 {
-    if (!koSelection()->count()) {
+    if (koSelection() && koSelection()->count() <= 0) {
         event->ignore();
         return;
     }
@@ -692,8 +701,7 @@ void DefaultTool::customMoveEvent(KoPointerEvent *event)
 
 void DefaultTool::repaintDecorations()
 {
-    Q_ASSERT(koSelection());
-    if (koSelection()->count() > 0) {
+    if (koSelection() && koSelection()->count() > 0) {
         canvas()->updateCanvas(handlesSize());
     }
 }
@@ -758,7 +766,7 @@ KoFlake::SelectionHandle DefaultTool::handleAt(const QPointF &point, bool *inner
         KoFlake::NoHandle
     };
 
-    if (koSelection()->count() == 0) {
+    if (koSelection() && koSelection()->count() == 0) {
         return KoFlake::NoHandle;
     }
 
@@ -793,6 +801,10 @@ KoFlake::SelectionHandle DefaultTool::handleAt(const QPointF &point, bool *inner
 
 void DefaultTool::recalcSelectionBox()
 {
+    if (!koSelection()) {
+        return;
+    }
+
     if (koSelection()->count() == 0) {
         return;
     }
@@ -1202,6 +1214,33 @@ void DefaultTool::updateActions()
         }
     }
     action("object_ungroup")->setEnabled(groupShape);
+
+    {
+        KActionCollection *collection = this->canvas()->canvasController()->actionCollection();
+
+        QList<QAction*> actions;
+
+        actions << collection->action("edit_cut");
+        actions << collection->action("edit_copy");
+        actions << collection->action("edit_paste");
+
+        actions << m_separatorAction;
+
+        actions << action("object_order_front");
+        actions << action("object_order_raise");
+        actions << action("object_order_lower");
+        actions << action("object_order_back");
+
+        actions << m_separatorAction;
+
+        if (action("object_group")->isEnabled() || action("object_ungroup")->isEnabled()) {
+            actions << m_separatorAction;
+            actions << action("object_group");
+            actions << action("object_ungroup");
+        }
+
+        setPopupActionList(actions);
+    }
 
     emit selectionChanged(selection->count());
 }

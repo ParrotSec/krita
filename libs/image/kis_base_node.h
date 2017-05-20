@@ -322,6 +322,15 @@ public:
     virtual QImage createThumbnail(qint32 w, qint32 h);
 
     /**
+     * @return a thumbnail in requested size for the defined timestamp.
+     * The thumbnail is a rgba Image and may have transparent parts.
+     * Returns a fully transparent QImage of the requested size if the
+     * current node type cannot generate a thumbnail. If the requested
+     * size is too big, return a null QImage.
+     */
+    virtual QImage createThumbnailForFrame(qint32 w, qint32 h, int time);
+
+    /**
      * Ask this node to re-read the pertinent settings from the krita
      * configuration.
      */
@@ -362,25 +371,6 @@ public:
      * edited.
      */
     void setUserLocked(bool l);
-
-    /**
-     * Return the locked status of this node. System Locked nodes indicates
-     * that an algorithm is processing them and that an other
-     * algorithm need to wait before accessing it.
-     */
-    bool systemLocked() const;
-
-    /**
-     * Set the locked status of this node. System Locked nodes indicates
-     * that an algorithm is processing them and that an other
-     * algorithm need to wait before accessing it.
-     *
-     * A KisNode will update the layer model when the lock is released.
-     *
-     * @param l lock state
-     * @param update set false if the tools shouldn't be locked
-     */
-    virtual void setSystemLocked(bool l, bool update = true);
 
     /**
      * @return true if the node can be edited:
@@ -557,10 +547,6 @@ Q_SIGNALS:
      * This signal is emitted when the node is locked or unlocked with \ref setUserLocked.
      */
     void userLockingChanged(bool);
-    /**
-     * This signal is emitted when the node is locked or unlocked with \ref setSystemLocked.
-     */
-    void systemLockingChanged(bool);
 
     void keyframeChannelAdded(KisKeyframeChannel *channel);
 

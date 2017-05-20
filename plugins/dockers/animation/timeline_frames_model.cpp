@@ -22,6 +22,7 @@
 #include <QColor>
 #include <QMimeData>
 #include <QPointer>
+#include <KoResourceModel.h>
 
 #include "kis_layer.h"
 #include "kis_config.h"
@@ -45,6 +46,10 @@
 #include "kis_node_model.h"
 #include "kis_projection_leaf.h"
 #include "kis_time_range.h"
+
+#include "kis_node_view_color_scheme.h"
+#include "krita_utils.h"
+#include <QApplication>
 
 struct TimelineFramesModel::Private
 {
@@ -134,6 +139,12 @@ struct TimelineFramesModel::Private
         frame->setColorLabel(color);
     }
 
+    int layerColorLabel(int row) const {
+        KisNodeDummy *dummy = converter->dummyFromRow(row);
+        if (!dummy) return -1;
+        return dummy->node()->colorLabelIndex();
+    }
+
     QVariant layerProperties(int row) const {
         KisNodeDummy *dummy = converter->dummyFromRow(row);
         if (!dummy) return QVariant();
@@ -157,7 +168,8 @@ struct TimelineFramesModel::Private
         KisNodeSP node = dummy->node();
         if (!KisAnimationUtils::supportsContentFrames(node)) return false;
 
-        return KisAnimationUtils::createKeyframeLazy(image, node, KisKeyframeChannel::Content.id(), column, copy);
+        KisAnimationUtils::createKeyframeLazy(image, node, KisKeyframeChannel::Content.id(), column, copy);
+        return true;
     }
 
     bool addNewLayer(int row) {
@@ -206,7 +218,12 @@ void TimelineFramesModel::setNodeManipulationInterface(NodeManipulationInterface
 
 KisNodeSP TimelineFramesModel::nodeAt(QModelIndex index) const
 {
-    return m_d->converter->dummyFromRow(index.row())->node();
+    /**
+     * The dummy might not exist because the user could (quickly) change
+     * active layer and the list of the nodes in m_d->converter will change.
+     */
+    KisNodeDummy *dummy = m_d->converter->dummyFromRow(index.row());
+    return dummy ? dummy->node() : 0;
 }
 
 QList<KisKeyframeChannel *> TimelineFramesModel::channelsAt(QModelIndex index) const
@@ -321,15 +338,31 @@ QVariant TimelineFramesModel::data(const QModelIndex &index, int role) const
     case SpecialKeyframeExists: {
         return m_d->specialKeyframeExists(index.row(), index.column());
     }
-    case ColorLabel: {
+    case FrameColorLabelIndexRole: {
         int label = m_d->frameColorLabel(index.row(), index.column());
         return label > 0 ? label : QVariant();
     }
     case Qt::DisplayRole: {
-        return QVariant();
+        return m_d->layerName(index.row());
     }
     case Qt::TextAlignmentRole: {
         return QVariant(Qt::AlignHCenter | Qt::AlignVCenter);
+    }
+    case KoResourceModel::LargeThumbnailRole: {
+        KisNodeDummy *dummy = m_d->converter->dummyFromRow(index.row());
+        if (!dummy) {
+            return  QVariant();
+        }
+        const int maxSize = 200;
+
+        QSize size = dummy->node()->extent().size();
+        size.scale(maxSize, maxSize, Qt::KeepAspectRatio);
+        if (size.width() == 0 || size.height() == 0) {
+            // No thumbnail can be shown if there isn't width or height...
+            return QVariant();
+        }
+        QImage image(dummy->node()->createThumbnailForFrame(size.width(), size.height(), index.column()));
+        return image;
     }
     }
 
@@ -362,7 +395,7 @@ bool TimelineFramesModel::setData(const QModelIndex &index, const QVariant &valu
         }
         break;
     }
-    case ColorLabel: {
+    case FrameColorLabelIndexRole: {
         m_d->setFrameColorLabel(index.row(), index.column(), value.toInt());
     }
         break;
@@ -427,6 +460,18 @@ QVariant TimelineFramesModel::headerData(int section, Qt::Orientation orientatio
             KisNodeDummy *dummy = m_d->converter->dummyFromRow(section);
             if (!dummy) return QVariant();
             return dummy->node()->useInTimeline();
+        }
+        case Qt::BackgroundRole: {
+            int label = m_d->layerColorLabel(section);
+            if (label > 0) {
+                KisNodeViewColorScheme scm;
+                QColor color = scm.colorLabel(label);
+                QPalette pal = qApp->palette();
+                color = KritaUtils::blendColors(color, pal.color(QPalette::Button), 0.3);
+                return QBrush(color);
+            } else {
+                return QVariant();
+            }
         }
         }
     }
@@ -631,24 +676,14 @@ bool TimelineFramesModel::createFrame(const QModelIndex &dstIndex)
 {
     if (!dstIndex.isValid()) return false;
 
-    bool result = m_d->addKeyframe(dstIndex.row(), dstIndex.column(), false);
-    if (result) {
-        emit dataChanged(dstIndex, dstIndex);
-    }
-
-    return result;
+    return m_d->addKeyframe(dstIndex.row(), dstIndex.column(), false);
 }
 
 bool TimelineFramesModel::copyFrame(const QModelIndex &dstIndex)
 {
     if (!dstIndex.isValid()) return false;
 
-    bool result = m_d->addKeyframe(dstIndex.row(), dstIndex.column(), true);
-    if (result) {
-        emit dataChanged(dstIndex, dstIndex);
-    }
-
-    return result;
+    return m_d->addKeyframe(dstIndex.row(), dstIndex.column(), true);
 }
 
 QString TimelineFramesModel::audioChannelFileName() const

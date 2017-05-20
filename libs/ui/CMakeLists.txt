@@ -105,6 +105,7 @@ set(kritaui_LIB_SRCS
     kis_filter_manager.cc
     kis_filters_model.cc
     kis_histogram_view.cc
+    KisImageBarrierLockerWithFeedback.cpp
     kis_image_manager.cc
     kis_image_view_converter.cpp
     kis_import_catcher.cc
@@ -397,6 +398,8 @@ endif()
         ${kritaui_LIB_SRCS}
         kis_animation_frame_cache.cpp
         kis_animation_cache_populator.cpp
+        KisAnimationCacheRegenerator.cpp
+        dialogs/KisAnimationCacheUpdateProgressDialog.cpp
         canvas/kis_animation_player.cpp
         kis_animation_exporter.cpp
         kis_animation_importer.cpp
