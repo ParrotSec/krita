@@ -64,7 +64,6 @@
 #include <kis_pixel_selection.h>
 #include <kis_shape_selection.h>
 #include <kis_selection_manager.h>
-#include <kis_system_locker.h>
 #include <krita_utils.h>
 #include <kis_resources_snapshot.h>
 
@@ -151,9 +150,7 @@ void KisToolTransform::canvasUpdateRequested()
 
 void KisToolTransform::resetCursorStyle()
 {
-    KisTool::resetCursorStyle();
-
-    overrideCursorIfNotEditable();
+    setFunctionalCursor();
 }
 
 void KisToolTransform::resetRotationCenterButtonsRequested()
@@ -346,9 +343,21 @@ void KisToolTransform::endPrimaryAction(KoPointerEvent *event)
     endActionImpl(event, true, KisTool::NONE);
 }
 
+void KisToolTransform::activatePrimaryAction()
+{
+    currentStrategy()->activatePrimaryAction();
+    setFunctionalCursor();
+}
+
+void KisToolTransform::deactivatePrimaryAction()
+{
+    currentStrategy()->deactivatePrimaryAction();
+}
+
 void KisToolTransform::activateAlternateAction(AlternateAction action)
 {
     currentStrategy()->activateAlternateAction(action);
+    setFunctionalCursor();
 }
 
 void KisToolTransform::deactivateAlternateAction(AlternateAction action)

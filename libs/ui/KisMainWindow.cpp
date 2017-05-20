@@ -886,8 +886,19 @@ bool KisMainWindow::saveDocument(KisDocument *document, bool saveas, bool silent
     KisDelayedSaveDialog dlg(document->image(), KisDelayedSaveDialog::SaveDialog, 0, this);
     dlg.blockIfImageIsBusy();
 
-    if (dlg.result() != QDialog::Accepted) {
+    if (dlg.result() == KisDelayedSaveDialog::Rejected) {
         return false;
+    } else if (dlg.result() == KisDelayedSaveDialog::Ignored) {
+        QMessageBox::critical(0,
+                              i18nc("@title:window", "Krita"),
+                              i18n("You are saving a file while the image is "
+                                   "still rendering. The saved file may be "
+                                   "incomplete or corrupted.\n\n"
+                                   "Please select a location where the original "
+                                   "file will not be overridden!"));
+
+
+        saveas = true;
     }
 
     bool reset_url;
@@ -2016,6 +2027,7 @@ void KisMainWindow::setToolbarList(QList<QAction *> toolbarList)
 
 void KisMainWindow::slotDocumentTitleModified(const QString &caption, bool mod)
 {
+    updateCaption();
     updateCaption(caption, mod);
     updateReloadFileAction(d->activeView ? d->activeView->document() : 0);
 }
@@ -2170,7 +2182,7 @@ void KisMainWindow::checkSanity()
     // print error if the lcms engine is not available
     if (!KoColorSpaceEngineRegistry::instance()->contains("icc")) {
         // need to wait 1 event since exiting here would not work.
-        m_errorMessage = i18n("The Calligra LittleCMS color management plugin is not installed. Krita will quit now.");
+        m_errorMessage = i18n("The Krita LittleCMS color management plugin is not installed. Krita will quit now.");
         m_dieOnError = true;
         QTimer::singleShot(0, this, SLOT(showErrorAndDie()));
         return;

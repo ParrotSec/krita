@@ -103,8 +103,9 @@ public:
 class KisApplication::ResetStarting
 {
 public:
-    ResetStarting(KisSplashScreen *splash = 0)
+    ResetStarting(KisSplashScreen *splash, int fileCount)
         : m_splash(splash)
+        , m_fileCount(fileCount)
     {
     }
 
@@ -113,8 +114,7 @@ public:
 
             KConfigGroup cfg( KSharedConfig::openConfig(), "SplashScreen");
             bool hideSplash = cfg.readEntry("HideSplashAfterStartup", false);
-
-            if (hideSplash) {
+            if (m_fileCount > 0 || hideSplash) {
                 m_splash->hide();
             }
             else {
@@ -136,6 +136,7 @@ public:
     }
 
     QPointer<KisSplashScreen> m_splash;
+    int m_fileCount;
 };
 
 
@@ -175,12 +176,6 @@ KisApplication::KisApplication(const QString &key, int &argc, char **argv)
     }
     else {
         qDebug() << "Style override disabled, using" << style()->objectName();
-    }
-
-    if (KisConfig().readEntry("EnableHiDPI", false)) {
-#if QT_VERSION >= 0x050600
-        QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-#endif
     }
 
     KisOpenGL::initialize();
@@ -337,9 +332,11 @@ void KisApplication::loadPlugins()
 
 bool KisApplication::start(const KisApplicationArguments &args)
 {
-#if defined(Q_OS_WIN)  || defined (Q_OS_MAC)
-#ifdef ENV32BIT
     KisConfig cfg;
+
+#if defined(Q_OS_WIN)
+#ifdef ENV32BIT
+
     if (isWow64() && !cfg.readEntry("WarnedAbout32Bits", false)) {
         QMessageBox::information(0,
                                  i18nc("@title:window", "Krita: Warning"),
@@ -351,6 +348,14 @@ bool KisApplication::start(const KisApplicationArguments &args)
     }
 #endif
 #endif
+
+    QString opengl = cfg.canvasState();
+    if (opengl == "OPENGL_NOT_TRIED" ) {
+        cfg.setCanvasState("TRY_OPENGL");
+    }
+    else if (opengl != "OPENGL_SUCCESS") {
+        cfg.setCanvasState("OPENGL_FAILED");
+    }
 
     setSplashScreenLoadingText(i18n("Initializing Globals"));
     processEvents();
@@ -385,7 +390,8 @@ bool KisApplication::start(const KisApplicationArguments &args)
     Digikam::ThemeManager themeManager;
     themeManager.setCurrentTheme(group.readEntry("Theme", "Krita dark"));
 
-    ResetStarting resetStarting(d->splashScreen); // remove the splash when done
+
+    ResetStarting resetStarting(d->splashScreen, args.filenames().count()); // remove the splash when done
     Q_UNUSED(resetStarting);
 
     // Make sure we can save resources and tags
@@ -423,7 +429,6 @@ bool KisApplication::start(const KisApplicationArguments &args)
     // Get the command line arguments which we have to parse
     int argsCount = args.filenames().count();
     if (argsCount > 0) {
-
         // Loop through arguments
         short int nPrinted = 0;
         for (int argNumber = 0; argNumber < argsCount; argNumber++) {

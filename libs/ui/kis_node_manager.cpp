@@ -471,15 +471,16 @@ void KisNodeManager::slotTryFinishIsolatedMode()
 
 void KisNodeManager::createNode(const QString & nodeType, bool quiet, KisPaintDeviceSP copyFrom)
 {
+    if (!m_d->view->blockUntillOperationsFinished(m_d->view->image())) {
+        return;
+    }
+
     KisNodeSP activeNode = this->activeNode();
     if (!activeNode) {
         activeNode = m_d->view->image()->root();
     }
 
     KIS_ASSERT_RECOVER_RETURN(activeNode);
-    if (activeNode->systemLocked()) {
-        return;
-    }
 
     // XXX: make factories for this kind of stuff,
     //      with a registry
@@ -826,7 +827,7 @@ void KisNodeManager::activateNextNode()
 
     KisNodeSP node = activeNode->nextSibling();
 
-    while (node && node->childCount() > 0 && node->isEditable()) {
+    while (node && node->childCount() > 0) {
            node = node->firstChild();
     }
 
@@ -850,7 +851,7 @@ void KisNodeManager::activatePreviousNode()
 
     KisNodeSP node;
 
-    if (activeNode->childCount() > 0 && activeNode->isEditable()) {
+    if (activeNode->childCount() > 0) {
         node = activeNode->lastChild();
     }
     else {
@@ -1117,10 +1118,9 @@ void KisNodeManager::slotSplitAlphaSaveMerged()
 void KisNodeManager::cutLayersToClipboard()
 {
     KisNodeList nodes = this->selectedNodes();
-    KisNodeSP root = m_d->view->image()->root();
     if (nodes.isEmpty()) return;
 
-    KisClipboard::instance()->setLayers(nodes, root, false);
+    KisClipboard::instance()->setLayers(nodes, m_d->view->image(), false);
 
     KUndo2MagicString actionName = kundo2_i18n("Cut Nodes");
     KisNodeJugglerCompressed *juggler = m_d->lazyGetJuggler(actionName);
@@ -1130,9 +1130,7 @@ void KisNodeManager::cutLayersToClipboard()
 void KisNodeManager::copyLayersToClipboard()
 {
     KisNodeList nodes = this->selectedNodes();
-    KisNodeSP root = m_d->view->image()->root();
-
-    KisClipboard::instance()->setLayers(nodes, root, true);
+    KisClipboard::instance()->setLayers(nodes, m_d->view->image(), true);
 }
 
 void KisNodeManager::pasteLayersFromClipboard()

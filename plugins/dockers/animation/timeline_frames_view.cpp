@@ -58,6 +58,7 @@
 #include <KisImportExportManager.h>
 
 #include <KoFileDialog.h>
+#include <KoIconToolTip.h>
 #include <QDesktopServices>
 #include <QWidgetAction>
 
@@ -122,12 +123,14 @@ struct TimelineFramesView::Private
 
     KisCustomModifiersCatcher *modifiersCatcher;
     QPoint lastPressedPosition;
+    Qt::KeyboardModifiers lastPressedModifier;
     KisSignalCompressor selectionChangedCompressor;
 
     QStyleOptionViewItem viewOptionsV4() const;
     QItemViewPaintPairs draggablePaintPairs(const QModelIndexList &indexes, QRect *r) const;
     QPixmap renderToPixmap(const QModelIndexList &indexes, QRect *r) const;
 
+    KoIconToolTip tip;
 };
 
 TimelineFramesView::TimelineFramesView(QWidget *parent)
@@ -388,7 +391,7 @@ void TimelineFramesView::slotZoomButtonChanged(qreal zoomLevel)
 void TimelineFramesView::slotColorLabelChanged(int label)
 {
     Q_FOREACH(QModelIndex index, selectedIndexes()) {
-        m_d->model->setData(index, label, TimelineFramesModel::ColorLabel);
+        m_d->model->setData(index, label, TimelineFramesModel::FrameColorLabelIndexRole);
     }
 
     KisImageConfig config;
@@ -731,6 +734,20 @@ void TimelineFramesView::startDrag(Qt::DropActions supportedActions)
             }
         }
     } else {
+
+        /**
+         * Workaround for Qt5's bug: if we start a dragging action right during
+         * Shift-selection, Qt will get crazy. We cannot workaround it easily,
+         * because we would need to fork mouseMoveEvent() for that (where the
+         * decision about drag state is done). So we just abort dragging in that
+         * case.
+         *
+         * BUG:373067
+         */
+        if (m_d->lastPressedModifier & Qt::ShiftModifier) {
+            return;
+        }
+
         /**
          * Workaround for Qt5's bugs:
          *
@@ -861,10 +878,10 @@ void TimelineFramesView::mousePressEvent(QMouseEvent *event)
                 model()->data(index, TimelineFramesModel::SpecialKeyframeExists).toBool()) {
 
                 {
-                KisSignalsBlocker b(m_d->colorSelector);
-                QVariant colorLabel = index.data(TimelineFramesModel::ColorLabel);
-                int labelIndex = colorLabel.isValid() ? colorLabel.toInt() : 0;
-                m_d->colorSelector->setCurrentIndex(labelIndex);
+                    KisSignalsBlocker b(m_d->colorSelector);
+                    QVariant colorLabel = index.data(TimelineFramesModel::FrameColorLabelIndexRole);
+                    int labelIndex = colorLabel.isValid() ? colorLabel.toInt() : 0;
+                    m_d->colorSelector->setCurrentIndex(labelIndex);
                 }
 
                 m_d->frameEditingMenu->exec(event->globalPos());
@@ -872,16 +889,18 @@ void TimelineFramesView::mousePressEvent(QMouseEvent *event)
                 m_d->frameCreationMenu->exec(event->globalPos());
             }
         } else if (numSelectedItems > 1) {
-            int labelIndex = 0;
+            int labelIndex = -1;
             bool haveFrames = false;
             Q_FOREACH(QModelIndex index, selectedIndexes()) {
                 haveFrames |= index.data(TimelineFramesModel::FrameExistsRole).toBool();
-                QVariant colorLabel = index.data(TimelineFramesModel::ColorLabel);
+                QVariant colorLabel = index.data(TimelineFramesModel::FrameColorLabelIndexRole);
                 if (colorLabel.isValid()) {
-                    if (labelIndex == 0) {
+                    if (labelIndex == -1) {
+                        // First label
                         labelIndex = colorLabel.toInt();
-                    } else {
-                        labelIndex = 0;
+                    } else if (labelIndex != colorLabel.toInt()) {
+                        // Mixed colors in selection
+                        labelIndex = -1;
                         break;
                     }
                 }
@@ -897,7 +916,15 @@ void TimelineFramesView::mousePressEvent(QMouseEvent *event)
 
             m_d->multipleFrameEditingMenu->exec(event->globalPos());
         }
-
+    } else if (event->button() == Qt::MidButton) {
+        QModelIndex index = model()->buddy(indexAt(event->pos()));
+        if (index.isValid()) {
+            QStyleOptionViewItem option = viewOptions();
+            option.rect = visualRect(index);
+            // The offset of the headers is needed to get the correct position inside the view.
+            m_d->tip.showTip(this, event->pos() + QPoint(verticalHeader()->width(), horizontalHeader()->height()), option, index);
+        }
+        event->accept();
     } else {
         if (index.isValid()) {
             m_d->model->setLastClickedIndex(index);
@@ -905,6 +932,7 @@ void TimelineFramesView::mousePressEvent(QMouseEvent *event)
 
         m_d->lastPressedPosition =
             QPoint(horizontalOffset(), verticalOffset()) + event->pos();
+        m_d->lastPressedModifier = event->modifiers();
 
         QAbstractItemView::mousePressEvent(event);
     }
@@ -925,6 +953,15 @@ void TimelineFramesView::mouseMoveEvent(QMouseEvent *e)
 
             horizontalScrollBar()->setValue(offset.x());
             verticalScrollBar()->setValue(offset.y() / height);
+        }
+        e->accept();
+    } else if (e->buttons() == Qt::MidButton) {
+        QModelIndex index = model()->buddy(indexAt(e->pos()));
+        if (index.isValid()) {
+            QStyleOptionViewItem option = viewOptions();
+            option.rect = visualRect(index);
+            // The offset of the headers is needed to get the correct position inside the view.
+            m_d->tip.showTip(this, e->pos() + QPoint(verticalHeader()->width(), horizontalHeader()->height()), option, index);
         }
         e->accept();
     } else {
@@ -1060,4 +1097,21 @@ void TimelineFramesView::slotRemoveFrame()
     if (!indexes.isEmpty()) {
         m_d->model->removeFrames(indexes);
     }
+}
+
+bool TimelineFramesView::viewportEvent(QEvent *event)
+{
+    if (event->type() == QEvent::ToolTip && model()) {
+        QHelpEvent *he = static_cast<QHelpEvent *>(event);
+        QModelIndex index = model()->buddy(indexAt(he->pos()));
+        if (index.isValid()) {
+            QStyleOptionViewItem option = viewOptions();
+            option.rect = visualRect(index);
+            // The offset of the headers is needed to get the correct position inside the view.
+            m_d->tip.showTip(this, he->pos() + QPoint(verticalHeader()->width(), horizontalHeader()->height()), option, index);
+            return true;
+        }
+    }
+
+    return QTableView::viewportEvent(event);
 }

@@ -44,6 +44,7 @@
 #include "kis_meta_data_store.h"
 #include "kis_selection.h"
 #include "kis_paint_layer.h"
+#include "kis_raster_keyframe_channel.h"
 
 #include "kis_clone_layer.h"
 
@@ -798,6 +799,29 @@ QImage KisLayer::createThumbnail(qint32 w, qint32 h)
            originalDevice->createThumbnail(w, h, 1,
                                            KoColorConversionTransformation::internalRenderingIntent(),
                                            KoColorConversionTransformation::internalConversionFlags()) : QImage();
+}
+
+QImage KisLayer::createThumbnailForFrame(qint32 w, qint32 h, int time)
+{
+    if (w == 0 || h == 0) {
+        return QImage();
+    }
+
+    KisPaintDeviceSP originalDevice = original();
+    if (originalDevice) {
+        KisRasterKeyframeChannel *channel = originalDevice->keyframeChannel();
+
+        if (channel) {
+            KisPaintDeviceSP targetDevice = new KisPaintDevice(colorSpace());
+            KisKeyframeSP keyframe = channel->activeKeyframeAt(time);
+            channel->fetchFrame(keyframe, targetDevice);
+            return targetDevice->createThumbnail(w, h, 1,
+                                                 KoColorConversionTransformation::internalRenderingIntent(),
+                                                 KoColorConversionTransformation::internalConversionFlags());
+        }
+    }
+
+    return createThumbnail(w, h);
 }
 
 qint32 KisLayer::x() const

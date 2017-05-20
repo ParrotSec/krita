@@ -440,6 +440,7 @@ public:
     }
 
     class SafeSavingLocker;
+    class SavingImageSetter;
 };
 
 class KisDocument::Private::SafeSavingLocker {
@@ -484,14 +485,23 @@ public:
     }
 
     ~SafeSavingLocker() {
-         if (m_locked) {
-             m_imageLock.unlock();
-             d->savingLock.unlock();
+        if (m_locked) {
+            m_imageLock.unlock();
+            d->savingLock.unlock();
 
-             const int realAutoSaveInterval = KisConfig().autoSaveInterval();
-             d->document->setAutoSave(realAutoSaveInterval);
-         }
-     }
+            const int realAutoSaveInterval = KisConfig().autoSaveInterval();
+            d->document->setAutoSave(realAutoSaveInterval);
+        }
+    }
+
+    void doEmergencyLock() {
+        KIS_SAFE_ASSERT_RECOVER_RETURN(!m_locked);
+
+        if (d->savingLock.try_lock()) {
+            d->image->lock();
+            m_locked = true;
+        }
+    }
 
     bool successfullyLocked() const {
         return m_locked;
@@ -502,6 +512,22 @@ private:
     bool m_locked;
 
     KisImageBarrierLockAdapter m_imageLock;
+};
+
+class KisDocument::Private::SavingImageSetter {
+public:
+    SavingImageSetter(KisDocument::Private *_d, KisImageSP image)
+        : d(_d)
+    {
+        d->savingImage = image;
+    }
+
+    ~SavingImageSetter() {
+        d->savingImage.clear();
+    }
+
+private:
+    KisDocument::Private *d;
 };
 
 
@@ -668,116 +694,129 @@ bool KisDocument::saveFile(KisPropertiesConfigurationSP exportConfiguration)
 
     // Save it to be able to restore it after a failed save
     const bool wasModified = isModified();
-
-    // Show the dialog with the options, if any
+    bool ret = false;
+    bool suppressErrorDialog = fileBatchMode();
+    KisImportExportFilter::ConversionStatus status = KisImportExportFilter::OK;
 
     // The output format is set by koMainWindow, and by openFile
     QByteArray outputMimeType = d->outputMimeType;
-    if (outputMimeType.isEmpty())
+    if (outputMimeType.isEmpty()) {
         outputMimeType = d->outputMimeType = nativeFormatMimeType();
-
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-
-    if (backupFile()) {
-        Q_ASSERT(url().isLocalFile());
-        KBackup::backupFile(url().toLocalFile(), d->backupPath);
     }
-
-    qApp->processEvents();
-
-    bool ret = false;
-    bool suppressErrorDialog = false;
-    KisImportExportFilter::ConversionStatus status = KisImportExportFilter::OK;
-
-    setFileProgressUpdater(i18n("Saving Document"));
-
-    QFileInfo fi(localFilePath());
-    QString tempororaryFileName;
-    {
-        QTemporaryFile tf(QDir::tempPath() + "/XXXXXX" + fi.baseName() + "." + fi.completeSuffix());
-        tf.open();
-        tempororaryFileName = tf.fileName();
+    if (QFileInfo(url().toLocalFile()).exists() && !QFileInfo(url().toLocalFile()).isWritable()) {
+        setErrorMessage(i18n("%1 cannot be written to. Please save under a different name.", localFilePath()));
     }
-    Q_ASSERT(!tempororaryFileName.isEmpty());
+    else {
+        QApplication::setOverrideCursor(Qt::WaitCursor);
 
-    if (!isNativeFormat(outputMimeType)) {
-
-        if (!prepareLocksForSaving()) {
-            return false;
-        }
-        status = d->importExportManager->exportDocument(tempororaryFileName, outputMimeType, exportConfiguration);
-        unlockAfterSaving();
-
-        ret = status == KisImportExportFilter::OK;
-        suppressErrorDialog = (status == KisImportExportFilter::UserCancelled || status == KisImportExportFilter::BadConversionGraph || d->importExportManager->getBatchMode());
-        dbgFile << "Export status was" << status;
-    } else {
-        // Native format => normal save
-        ret = saveNativeFormat(tempororaryFileName);
-    }
-
-    if (ret) {
-        if (!d->suppressProgress) {
-            QPointer<KoUpdater> updater = d->progressUpdater->startSubtask(1, "clear undo stack");
-            updater->setProgress(0);
-            d->undoStack->setClean();
-            updater->setProgress(100);
-        } else {
-            d->undoStack->setClean();
+        if (backupFile()) {
+            Q_ASSERT(url().isLocalFile());
+            KBackup::backupFile(url().toLocalFile(), d->backupPath);
         }
 
-        QFile tempFile(tempororaryFileName);
-        QString s = localFilePath();
-        QFile dstFile(s);
-        while (QFileInfo(s).exists()) {
-            s.append("_");
+        qApp->processEvents();
+        setFileProgressUpdater(i18n("Saving Document"));
+
+        QFileInfo fi(localFilePath());
+        QString tempororaryFileName;
+        {
+            QTemporaryFile tf(QDir::tempPath() + "/XXXXXX" + fi.baseName() + "." + fi.completeSuffix());
+            tf.open();
+            tempororaryFileName = tf.fileName();
         }
-        bool r;
-        if (s != localFilePath()) {
-            r = dstFile.rename(s);
-            if (!r) {
-               setErrorMessage(i18n("Could not rename original file to %1: %2", dstFile.fileName(), dstFile. errorString()));
-            }
-         }
+        Q_ASSERT(!tempororaryFileName.isEmpty());
 
-        if (tempFile.exists()) {
+        if (!isNativeFormat(outputMimeType)) {
 
-            ret = tempFile.copy(localFilePath());
-            if (!ret) {
-                setErrorMessage(i18n("Copying the temporary file failed: %1 to %2: %3", tempFile.fileName(), dstFile.fileName(), tempFile.errorString()));
-            }
-            else {
-                r = tempFile.remove();
-                if (!ret) {
-                    setErrorMessage(i18n("Could not remove temporary file %1: %2", tempFile.fileName(), tempFile.errorString()));
+            {
+                Private::SafeSavingLocker locker(d);
+
+                if (!locker.successfullyLocked()) {
+                    d->lastErrorMessage = i18n("The image was still busy while saving. Your saved image might be incomplete.");
+                    locker.doEmergencyLock();
                 }
-                else if (s != localFilePath()) {
-                    r = dstFile.remove();
+
+                if (!locker.successfullyLocked()) {
+                    d->lastErrorMessage = i18n("Could not lock the image for saving.");
+                    return false;
+                }
+
+                KIS_SAFE_ASSERT_RECOVER_NOOP(d->image->locked());
+                Private::SavingImageSetter savingImageSetter(d, d->image);
+
+                status = d->importExportManager->exportDocument(tempororaryFileName, outputMimeType, exportConfiguration);
+            }
+
+            ret = status == KisImportExportFilter::OK;
+            suppressErrorDialog = (status == KisImportExportFilter::UserCancelled || status == KisImportExportFilter::BadConversionGraph || d->importExportManager->getBatchMode());
+            dbgFile << "Export status was" << status;
+        } else {
+            // Native format => normal save
+            ret = saveNativeFormat(tempororaryFileName);
+        }
+
+        if (ret) {
+            if (!d->suppressProgress) {
+                QPointer<KoUpdater> updater = d->progressUpdater->startSubtask(1, "clear undo stack");
+                updater->setProgress(0);
+                d->undoStack->setClean();
+                updater->setProgress(100);
+            } else {
+                d->undoStack->setClean();
+            }
+
+            QFile tempFile(tempororaryFileName);
+            QString s = localFilePath();
+            QFile dstFile(s);
+            while (QFileInfo(s).exists()) {
+                s.append("_");
+            }
+            bool r;
+            if (s != localFilePath()) {
+                r = dstFile.rename(s);
+                if (!r) {
+                    setErrorMessage(i18n("Could not rename original file to %1: %2", dstFile.fileName(), dstFile. errorString()));
+                }
+            }
+
+            if (tempFile.exists()) {
+
+                ret = tempFile.copy(localFilePath());
+                if (!ret) {
+                    setErrorMessage(i18n("Copying the temporary file failed: %1 to %2: %3", tempFile.fileName(), dstFile.fileName(), tempFile.errorString()));
+                }
+                else {
+                    r = tempFile.remove();
                     if (!ret) {
-                        setErrorMessage(i18n("Could not remove saved original file: %1", dstFile.errorString()));
+                        setErrorMessage(i18n("Could not remove temporary file %1: %2", tempFile.fileName(), tempFile.errorString()));
+                    }
+                    else if (s != localFilePath()) {
+                        r = dstFile.remove();
+                        if (!ret) {
+                            setErrorMessage(i18n("Could not remove saved original file: %1", dstFile.errorString()));
+                        }
                     }
                 }
             }
-        }
-        else {
-            setErrorMessage(i18n("The temporary file %1 is gone before we could copy it!", tempFile.fileName()));
-            ret = false;
-        }
+            else {
+                setErrorMessage(i18n("The temporary file %1 is gone before we could copy it!", tempFile.fileName()));
+                ret = false;
+            }
 
-        if (errorMessage().isEmpty()) {
-            removeAutoSaveFiles();
-        }
-        else {
-            qWarning() << "Error while saving:" << errorMessage();
-        }
-        // Restart the autosave timer
-        // (we don't want to autosave again 2 seconds after a real save)
-        setAutoSave(d->autoSaveDelay);
+            if (errorMessage().isEmpty()) {
+                removeAutoSaveFiles();
+            }
+            else {
+                qWarning() << "Error while saving:" << errorMessage();
+            }
+            // Restart the autosave timer
+            // (we don't want to autosave again 2 seconds after a real save)
+            setAutoSave(d->autoSaveDelay);
 
-        d->mimeType = outputMimeType;
-        setConfirmNonNativeSave(isExporting(), false);
+            d->mimeType = outputMimeType;
+            setConfirmNonNativeSave(isExporting(), false);
+        }
     }
-
     if (!ret) {
         if (!suppressErrorDialog) {
 
@@ -942,55 +981,25 @@ bool KisDocument::isModified() const
     return d->modified;
 }
 
-bool KisDocument::prepareLocksForSaving()
-{
-    KisImageSP copiedImage;
-
-    {
-        Private::SafeSavingLocker locker(d);
-        if (locker.successfullyLocked()) {
-            copiedImage = d->image->clone(true);
-        } else if (!isAutosaving()) {
-            // even though it is a recovery operation, we should ensure we do not enter saving twice!
-            std::unique_lock<StdLockableWrapper<QMutex>> l(d->savingLock, std::try_to_lock);
-
-            if (l.owns_lock()) {
-                d->lastErrorMessage = i18n("The image was still busy while saving. Your saved image might be incomplete.");
-                d->image->lock();
-                copiedImage = d->image->clone(true);
-                copiedImage->initialRefreshGraph();
-                d->image->unlock();
-            }
-        }
-    }
-
-    bool result = false;
-
-    // ensure we do not enter saving twice
-    if (copiedImage && d->savingMutex.tryLock()) {
-        d->savingImage = copiedImage;
-        result = true;
-    } else {
-        qWarning() << "Could not lock the document for saving!";
-        d->lastErrorMessage = i18n("Could not lock the image for saving.");
-    }
-
-    return result;
-}
-
-void KisDocument::unlockAfterSaving()
-{
-    d->savingImage = 0;
-    d->savingMutex.unlock();
-}
-
 bool KisDocument::saveNativeFormat(const QString & file)
 {
-    if (!prepareLocksForSaving()) {
+    d->lastErrorMessage.clear();
+
+    Private::SafeSavingLocker locker(d);
+
+    if (!locker.successfullyLocked()) {
+        d->lastErrorMessage = i18n("The image was still busy while saving. Your saved image might be incomplete.");
+        locker.doEmergencyLock();
+    }
+
+    if (!locker.successfullyLocked()) {
+        d->lastErrorMessage = i18n("Could not lock the image for saving.");
         return false;
     }
 
-    d->lastErrorMessage.clear();
+    KIS_SAFE_ASSERT_RECOVER_NOOP(d->image->locked());
+    Private::SavingImageSetter savingImageSetter(d, d->image);
+
     //dbgUI <<"Saving to store";
 
     KoStore::Backend backend = KoStore::Auto;
@@ -1004,10 +1013,8 @@ bool KisDocument::saveNativeFormat(const QString & file)
         if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
             bool success = saveToStream(&f);
             f.close();
-            unlockAfterSaving();
             return success;
         } else {
-            unlockAfterSaving();
             return false;
         }
     }
@@ -1022,7 +1029,6 @@ bool KisDocument::saveNativeFormat(const QString & file)
     }
     if (store->bad()) {
         d->lastErrorMessage = i18n("Could not create the file for saving");   // more details needed?
-        unlockAfterSaving();
         delete store;
         return false;
     }
@@ -1035,8 +1041,36 @@ bool KisDocument::saveNativeFormat(const QString & file)
     } else {
         result = saveNativeFormatCalligraImpl(store);
     }
-    unlockAfterSaving();
+
+    delete store;
     return result;
+}
+
+QByteArray KisDocument::serializeToNativeByteArray()
+{
+    QByteArray byteArray;
+    QBuffer buffer(&byteArray);
+
+    QScopedPointer<KoStore> store(KoStore::createStore(&buffer, KoStore::Write, nativeFormatMimeType(), KoStore::Auto));
+    if (store->bad()) {
+        return byteArray;
+    }
+
+    Private::SafeSavingLocker locker(d);
+    if (!locker.successfullyLocked()) {
+        return byteArray;
+    }
+
+    Private::SavingImageSetter savingImageSetter(d, d->image);
+
+    KisAsyncActionFeedback f(i18n("Exporting document..."), 0);
+    bool result = f.runAction(std::bind(&KisDocument::saveNativeFormatCalligraImpl, this, store.data()));
+
+    if (!result) {
+        byteArray.clear();
+    }
+
+    return byteArray;
 }
 
 bool KisDocument::saveNativeFormatCalligraDirect(KoStore *store)
@@ -1060,12 +1094,10 @@ bool KisDocument::saveNativeFormatCalligraImpl(KoStore *store)
         KoStoreDevice dev(store);
         if (!saveToStream(&dev) || !store->close()) {
             dbgUI << "saveToStream failed";
-            delete store;
             return false;
         }
     } else {
         d->lastErrorMessage = i18n("Not able to write '%1'. Partition full?", QString("maindoc.xml"));
-        delete store;
         return false;
     }
     if (store->open("documentinfo.xml")) {
@@ -1088,16 +1120,13 @@ bool KisDocument::saveNativeFormatCalligraImpl(KoStore *store)
     }
 
     if (!completeSaving(store)) {
-        delete store;
         return false;
     }
     dbgUI << "Saving done of url:" << url().url();
     if (!store->finalize()) {
-        delete store;
         return false;
     }
-    // Success
-    delete store;
+
     return true;
 }
 
@@ -1354,7 +1383,7 @@ bool KisDocument::openFile()
             }
             d->isLoading = false;
             clearFileProgressUpdater();
-           return false;
+            return false;
         }
         d->isEmpty = false;
         //qDebug() << "importedFile" << importedFile << "status:" << static_cast<int>(status);
@@ -2235,8 +2264,7 @@ bool KisDocument::closeUrl(bool promptToSave)
 
 bool KisDocument::saveAs(const QUrl &kurl, KisPropertiesConfigurationSP exportConfiguration)
 {
-    if (!kurl.isValid())
-    {
+    if (!kurl.isValid()) {
         errKrita << "saveAs: Malformed URL " << kurl.url() << endl;
         return false;
     }

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>426</width>
-    <height>664</height>
+    <width>479</width>
+    <height>674</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -494,6 +494,28 @@
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QToolButton" name="btnTransformAroundPivotPoint">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>Transform around pivot point (Alt)</string>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="checkable">
+              <bool>true</bool>
+             </property>
+             <property name="autoExclusive">
+              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -2156,8 +2178,8 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="cageTransformButtonGroup"/>
-  <buttongroup name="buttonGroup"/>
   <buttongroup name="freeTransformRadioGroup"/>
+  <buttongroup name="buttonGroup"/>
+  <buttongroup name="cageTransformButtonGroup"/>
  </buttongroups>
 </ui>
